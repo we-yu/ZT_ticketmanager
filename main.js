@@ -36,6 +36,12 @@ function paddingright(val,char,n){
   for(; val.length < n; val+=char);
   return val;
  }
+
+function getTodays0000(){
+  var _d = new Date();
+  var  d = new Date(_d.getFullYear(), _d.getMonth(), _d.getDate(), 0, 0, 0);
+  return d;
+}
  
 function textDivide(tgtText) {
   bodyText = tgtText;
@@ -54,7 +60,7 @@ function textDivide(tgtText) {
 }
 
 function getCommandCode(tgtText) {
-  cmdis = "read";
+  cmdis = tgtText[1];
   return cmdis;
 }
 
@@ -87,33 +93,62 @@ function doPost(e) {
     debugLog("a This is bot message : " + bodyText);
   }
 
+  debugLog(dividedTxt[0]);
+  debugLog(dividedTxt[1]);
+  debugLog(dividedTxt[2]);
   var cmd = getCommandCode(dividedTxt);
+  var opt = dividedTxt[2];
   // debugLog("cmd == ", cmd, typeof cmd);
-  var match = "read";
-
+  var readCmd = "read";
+  var allCommand = "--all";
+ 
   // debugLog(cmd, ":", match);
   // debugLog(typeof cmd, ":", typeof match);
 
+  debugLog(cmd + ":" + readCmd);
+  if(cmd === readCmd){
+    debugLog(cmd + ":" + readCmd);
+    var tgtFile  = SpreadsheetApp.getActiveSpreadsheet();
+    var tgtSheet = tgtFile.getActiveSheet();
+    
+    var startrow = 1;
+    var startcol = 1;
+    var lastrow = tgtSheet.getLastRow();
+    var lastcol = tgtSheet.getLastColumn();
+    
+    var sheetdata = tgtSheet.getSheetValues(startrow, startcol, lastrow, lastcol);
+    
+    var textWidths = [6, 14, 10, 12, 12, 18, 42];
+    
+    msgs = [];
+    rowdata = "";
+    var tStat;
+    var isToday;
+    var compText = "Completed";
+    var allFlg = false;
 
-  var tgtFile  = SpreadsheetApp.getActiveSpreadsheet();
-  var tgtSheet = tgtFile.getActiveSheet();
+    if(opt === allCommand)
+      allFlg = true;
 
-  var startrow = 1;
-  var startcol = 1;
-  var lastrow = tgtSheet.getLastRow();
-  var lastcol = tgtSheet.getLastColumn();
-  
-  var sheetdata = tgtSheet.getSheetValues(startrow, startcol, lastrow, lastcol);
-
-  var textWidths = [6, 14, 10, 12, 12, 18, 42];
-
-  msgs = [];
-  rowdata = "";
-  for (var i = 0 ; i < lastrow ; i++ ){
+    for (var i = 0 ; i < lastrow ; i++ ){
+      tStat = "";
+      isToday = "";
       for (var j = 0 ; j < lastcol ; j++ ){
         if (j == 7) break;
+
         item  = sheetdata[i][j];
+        
+        if(j == 1){
+          tStat = item;
+        }
+        
         if(i != 0 && j == 5){
+          todays0000 = getTodays0000().getTime();
+          ticketTime = item.getTime();
+          debugLog(todays0000 + ":" + ticketTime);
+          if(todays0000 < ticketTime)
+            isToday = true;
+          // debugLog(item + ":" + typeof item);
           item = Utilities.formatDate(item, 'Asia/Bangkok', 'yyyy-MM-dd HH:mm');
         }
         if(i != 0 && j == 6){
@@ -121,29 +156,46 @@ function doPost(e) {
         }
         item  = item.toString();
         item  = paddingright(item, " ", textWidths[j]);
-
+        
         rowdata += item;
       }
-    msgs.push(rowdata);
-    rowdata = "";
-  }
-  // for (var i = 0 ; i < msgs.length ; i++ ){
-  //   debugLog(msgs[i]);
-  // }
-  // -------------------------
-  
-  var accountId = json.webhook_event.account_id;
-  var messageId = json.webhook_event.message_id;
+      debugLog(isToday + ":" + tStat);
 
-  var body = '';
-  body += '[code]';
-  
-  for (var i = 0 ; i < msgs.length ; i++ ){
-    body += msgs[i] + '\n';
+      if(allFlg) {
+        msgs.push(rowdata);
+      }
+      else {
+        if(isToday) {
+          msgs.push(rowdata);
+        }
+        else {
+          if(tStat !== compText) {
+            msgs.push(rowdata);
+          }
+        }
+      }
+      rowdata = "";
+    }
+    // for (var i = 0 ; i < msgs.length ; i++ ){
+    //   debugLog(msgs[i]);
+    // }
+    // -------------------------
+    
+    var accountId = json.webhook_event.account_id;
+    var messageId = json.webhook_event.message_id;
+    
+    var body = '';
+    body += '[code]';
+    
+    for (var i = 0 ; i < msgs.length ; i++ ){
+      body += msgs[i] + '\n';
+    }
+    
+    body += '[/code]';
+    params.payload = {body :body};
+    
+    UrlFetchApp.fetch(url, params);
   }
-  
-  body += '[/code]';
-  params.payload = {body :body};
-  
-  UrlFetchApp.fetch(url, params);
+
+
 }
